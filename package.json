@@ -1,26 +1,18 @@
 {
   "name": "html-slideshow",
-  "version": "1.0.2",
+  "version": "2.3.0",
   "description": "将Markdown演示大纲转换为HTML静态幻灯片，自动分页、理解布局规划、生成对应HTML结构",
-  "main": "index.js",
+  "main": "scripts/generate-html.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "split": "node scripts/split-slides.js",
+    "generate": "node scripts/generate-html.js"
   },
-  "bin": {
-    "html-slideshow-split": "./scripts/split-slides.js",
-    "html-slideshow-generate": "./scripts/generate-html.js"
-  },
-  "keywords": [
-    "markdown",
-    "slideshow",
-    "presentation",
-    "html",
-    "openclaw"
-  ],
-  "author": "Vincent",
+  "keywords": ["markdown", "presentation", "slides", "html", "openclaw"],
+  "author": "零壹",
   "license": "MIT",
-  "dependencies": {},
-  "engines": {
-    "node": ">=14.0.0"
+  "dependencies": {
+    "marked": "^12.0.0",
+    "highlight.js": "^11.9.0",
+    "chart.js": "^4.4.1"
   }
 }

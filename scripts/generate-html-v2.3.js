@@ -1,38 +1,82 @@
 #!/usr/bin/env node
 
 /**
- * HTML Slideshow v2.3 - Final fix for cover page
- * Direct template replacement without nested divs
+ * HTML Slideshow v2.3 - Component-based template system
+ * Parse layout description and generate corresponding HTML structure
+ * Using component registry and theme management
  */
 
 const fs = require('fs');
 const path = require('path');
 const MarkdownValidator = require('./markdown-validator');
-const LayoutParser = require('./layout-parser');
+const LayoutAnalyzer = require('./layout-analyzer');
+const ComponentRegistry = require('./component-registry');
+const ThemeManager = require('./theme-manager');
 
-// Theme configurations
-const THEMES = {
-  default: {
-    primaryColor: '#2563eb',
-    primaryColorRGB: '37, 99, 235'
-  },
-  nvidia: {
-    primaryColor: '#76b900',
-    primaryColorRGB: '118, 185, 0'
-  },
-  aliyun: {
-    primaryColor: '#FF6A00',
-    primaryColorRGB: '255, 106, 0'
-  },
-  dark: {
-    primaryColor: '#60a5fa',
-    primaryColorRGB: '96, 165, 250'
-  },
-  tech: {
-    primaryColor: '#dc2626',
-    primaryColorRGB: '220, 38, 38'
-  }
-};
+// Initialize theme manager
+const themeManager = new ThemeManager();
+themeManager.initializeBuiltInThemes();
+themeManager.loadCustomThemes();
+
+/**
+ * Get theme configuration with fallbacks
+ */
+function getThemeConfig(themeName) {
+  const builtInThemes = {
+    default: {
+      primaryColor: '#2563eb',
+      primaryColorRGB: '37, 99, 235',
+      secondaryColor: '#1a1a1a',
+      textColor: '#1f2937',
+      textLight: '#6b7280',
+      bgColor: '#ffffff'
+    },
+    nvidia: {
+      primaryColor: '#76b900',
+      primaryColorRGB: '118, 185, 0',
+      secondaryColor: '#1a1a1a',
+      textColor: '#1f2937',
+      textLight: '#6b7280',
+      bgColor: '#ffffff'
+    },
+    aliyun: {
+      primaryColor: '#FF6A00',
+      primaryColorRGB: '255, 106, 0',
+      secondaryColor: '#1a1a1a',
+      textColor: '#1f2937',
+      textLight: '#6b7280',
+      bgColor: '#ffffff'
+    },
+    dark: {
+      primaryColor: '#60a5fa',
+      primaryColorRGB: '96, 165, 250',
+      secondaryColor: '#ffffff',
+      textColor: '#ffffff',
+      textLight: '#a0a0a0',
+      bgColor: '#1a1a1a'
+    },
+    tech: {
+      primaryColor: '#dc2626',
+      primaryColorRGB: '220, 38, 38',
+      secondaryColor: '#000000',
+      textColor: '#000000',
+      textLight: '#333333',
+      bgColor: '#ffffff'
+    }
+  };
+
+  return builtInThemes[themeName] || builtInThemes.default;
+}
+
+/**
+ * Parse layout description from markdown with enhanced detection
+ */
+function parseLayoutDescription(content) {
+  const analyzer = new LayoutAnalyzer();
+  const layout = analyzer.analyzeLayout(content);
+  
+  return { layout: layout, contentWithoutLayout: content };
+}
 
 /**
  * Get first part of content (for split layouts)
@@ -71,46 +115,34 @@ function getNthPart(content, index) {
 }
 
 /**
- * Generate complete slide HTML based on layout
+ * Generate HTML for a specific layout using components
  */
-function generateCompleteSlideHTML(layout, content, title, themeConfig) {
-  // Read slide template
-  const slideTemplate = fs.readFileSync(path.join(__dirname, '../templates/slide.html'), 'utf8');
+function generateHTMLForLayout(layout, content, title) {
+  const registry = ComponentRegistry;
   
-  let slideContent;
   switch (layout) {
     case 'split-2':
-      slideContent = `
-<div id="md-content"></div>
-<div class="split-layout">
-  <div class="column" id="col-1">
-${getFirstPart(content)}
-  </div>
-  <div class="column" id="col-2">
-${getSecondPart(content)}
-  </div>
-</div>
-`;
-      break;
+      return registry.render('split-layout', {
+        left: getFirstPart(content),
+        right: getSecondPart(content)
+      });
 
     case 'grid-2x2':
-      slideContent = `
-<div id="md-content"></div>
-<div class="grid-4">
-  <div class="grid-card" id="cell-1">${getNthPart(content, 0)}</div>
-  <div class="grid-card" id="cell-2">${getNthPart(content, 1)}</div>
-  <div class="grid-card" id="cell-3">${getNthPart(content, 2)}</div>
-  <div class="grid-card" id="cell-4">${getNthPart(content, 3)}</div>
-</div>
-`;
-      break;
+      return registry.render('grid', {
+        columns: 2,
+        items: [
+          getNthPart(content, 0),
+          getNthPart(content, 1), 
+          getNthPart(content, 2),
+          getNthPart(content, 3)
+        ]
+      });
 
     case 'table-chart':
-      slideContent = `
-<div id="md-content"></div>
+      return `
 <div class="chart-wrapper">
   <div class="table-side">
-${content}
+    ${content}
   </div>
   <div class="chart-side">
     <div class="chart-container">
@@ -119,86 +151,50 @@ ${content}
   </div>
 </div>
 `;
-      break;
 
     case 'vertical':
-      slideContent = `
-<div class="full-content">
-  <div id="md-content"></div>
-${content}
-</div>
-`;
-      break;
-
-    case 'cover':
-      slideContent = `
-<div class="slide-content">
-  <div id="md-content"></div>
-</div>
-`;
-      break;
+      return `<div class="full-content">${content}</div>`;
 
     case 'full':
     default:
-      slideContent = `
-<div class="full-content">
-  <div id="md-content"></div>
-${content}
-</div>
-`;
-      break;
+      return `<div class="full-content">${content}</div>`;
   }
-
-  // Apply layout class to slide div
-  let slideClass = 'slide';
-  if (layout === 'cover') {
-    slideClass += ' cover';
-  }
-
-  let html = slideTemplate
-    .replace(/{{TITLE}}/g, title)
-    .replace(/{{MAIN_TITLE}}/g, title)
-    .replace(/{{PRIMARY_COLOR}}/g, themeConfig.primaryColor)
-    .replace(/{{PRIMARY_COLOR_RGB}}/g, themeConfig.primaryColorRGB)
-    .replace(/{{{CONTENT_RAW}}}/g, content)
-    .replace(/<div class="slide">/, `<div class="${slideClass}">`)
-    .replace(/<div id="content"><\/div>/, `<div id="content">${slideContent}</div>`);
-
-  return html;
 }
 
 /**
  * Generate fallback HTML when main generation fails
  */
-function generateFallbackHTML(content, title, themeConfig) {
+function generateFallbackHTML(content, title) {
   console.warn(`Using fallback HTML for: ${title}`);
-  
-  const slideTemplate = fs.readFileSync(path.join(__dirname, '../templates/slide.html'), 'utf8');
-  return slideTemplate
-    .replace(/{{TITLE}}/g, title)
-    .replace(/{{MAIN_TITLE}}/g, title)
-    .replace(/{{PRIMARY_COLOR}}/g, themeConfig.primaryColor)
-    .replace(/{{PRIMARY_COLOR_RGB}}/g, themeConfig.primaryColorRGB)
-    .replace(/{{{CONTENT_RAW}}}/g, content)
-    .replace(/<div class="slide">/, `<div class="slide">`)
-    .replace(/<div id="content"><\/div>/, `<div id="content"><div class="full-content"><h1>${title}</h1>${content}</div></div>`);
+  return `<div class="slide"><div class="full-content"><h1>${title}</h1>${content}</div></div>`;
 }
 
 /**
- * Detect layout from filename
+ * Apply theme variables to template
  */
-function detectLayoutFromFilename(filename) {
-  if (filename.toLowerCase().includes('cover')) {
-    return 'cover';
-  }
-  return null;
+function applyThemeToTemplate(template, themeConfig) {
+  let result = template;
+  
+  // Replace theme variables
+  result = result.replace(/{{PRIMARY_COLOR}}/g, themeConfig.primaryColor);
+  result = result.replace(/{{PRIMARY_COLOR_RGB}}/g, themeConfig.primaryColorRGB);
+  result = result.replace(/{{SECONDARY_COLOR}}/g, themeConfig.secondaryColor);
+  result = result.replace(/{{TEXT_COLOR}}/g, themeConfig.textColor);
+  result = result.replace(/{{TEXT_LIGHT}}/g, themeConfig.textLight);
+  result = result.replace(/{{BG_COLOR}}/g, themeConfig.bgColor);
+  
+  // Set font family
+  const fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  result = result.replace(/var\(--font-family,[^)]+\)/g, fontFamily);
+  
+  return result;
 }
 
 /**
  * Main function to generate HTML slides
  */
 function generateHTMLSlides(inputDir, htmlOutputDir, title, themeName) {
-  const themeConfig = THEMES[themeName] || THEMES.default;
+  const themeConfig = getThemeConfig(themeName);
   
   // Ensure output directories exist
   const slidesHtmlDir = path.join(htmlOutputDir, 'slides');
@@ -206,6 +202,13 @@ function generateHTMLSlides(inputDir, htmlOutputDir, title, themeName) {
     fs.mkdirSync(slidesHtmlDir, { recursive: true });
   }
 
+  // Read slide template (v2.3 version)
+  const slideTemplatePath = path.join(__dirname, '../templates/slide-v2.3.html');
+  let slideTemplate = fs.readFileSync(slideTemplatePath, 'utf8');
+  
+  // Apply theme to template
+  slideTemplate = applyThemeToTemplate(slideTemplate, themeConfig);
+  
   // Validate and process each slide
   const validator = new MarkdownValidator();
   const mdFiles = fs.readdirSync(inputDir).filter(f => f.endsWith('.md'));
@@ -225,30 +228,29 @@ function generateHTMLSlides(inputDir, htmlOutputDir, title, themeName) {
 
     try {
       const content = fs.readFileSync(filePath, 'utf8');
-      
-      // First, check filename for cover detection
-      let layout = detectLayoutFromFilename(filename);
-      let cleanContent = content;
-      
-      // If not cover, parse layout from content
-      if (!layout) {
-        const parser = new LayoutParser();
-        const result = parser.parse(content);
-        layout = result.layout;
-        cleanContent = result.cleanContent;
-      }
+
+      // Parse layout with enhanced detection
+      const { layout, contentWithoutLayout } = parseLayoutDescription(content);
 
       // Don't escape - marked will render correctly, HTML is allowed
-      const contentRaw = cleanContent.trim();
+      const contentRaw = contentWithoutLayout.trim();
 
       // Generate HTML with error handling
       let html;
       try {
-        html = generateCompleteSlideHTML(layout, contentRaw, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '), themeConfig);
+        const layoutHTML = generateHTMLForLayout(layout, contentRaw, filename);
+        html = slideTemplate
+          .replace(/{{TITLE}}/g, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '))
+          .replace(/{{MAIN_TITLE}}/g, title)
+          .replace(/{{{CONTENT_RAW}}}/g, contentRaw)
+          .replace(/<div class="slide"/, `<div class="slide" data-layout="${layout}"`);
       } catch (layoutError) {
         console.error(`Layout generation failed for ${filename}:`, layoutError.message);
         // Use fallback HTML
-        html = generateFallbackHTML(contentRaw, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '), themeConfig);
+        html = slideTemplate
+          .replace(/{{TITLE}}/g, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '))
+          .replace(/{{MAIN_TITLE}}/g, title)
+          .replace(/{{{CONTENT_RAW}}}/g, contentRaw);
       }
 
       // Write output
@@ -263,7 +265,10 @@ function generateHTMLSlides(inputDir, htmlOutputDir, title, themeName) {
       // Create fallback slide
       try {
         const fallbackContent = `# Error Processing Slide\n\nFailed to process ${filename}. Please check the original markdown file.`;
-        const fallbackHTML = generateFallbackHTML(fallbackContent, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '), themeConfig);
+        const fallbackHTML = slideTemplate
+          .replace(/{{TITLE}}/g, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '))
+          .replace(/{{MAIN_TITLE}}/g, title)
+          .replace(/{{{CONTENT_RAW}}}/g, fallbackContent);
 
         const htmlFilename = filename.replace(/\.md$/, '.html');
         const outputPath = path.join(slidesHtmlDir, htmlFilename);

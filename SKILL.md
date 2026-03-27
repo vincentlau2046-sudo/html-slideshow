@@ -59,10 +59,6 @@ metadata: {"openclaw":{"emoji":"🖥️","requires":{"bins":["node"]}}}
 - **布局识别**：根据"页面布局规划"文字描述，生成对应HTML布局
 - **完整键盘交互**：方向键、空格、回车、退格都支持翻页，F键全屏
 - **多主题支持**：default(蓝色商务)、nvidia(绿色)、aliyun(橙色)、dark(深色)、tech(科技风格-白色主色调/黑色字体/红色高亮)
-- **组件化架构**：可插拔的UI组件系统，支持自定义组件开发
-- **主题系统**：完整的主题配置和管理，支持用户自定义主题
-- **智能分页**：基于内容密度和语义边界的动态分页算法
-- **布局识别**：5种布局类型自动检测（split-2, grid-2x2, vertical, table-chart, full）、tech(科技风格-白色主色调/黑色字体/红色高亮)
 - **静态输出**：纯HTML+CSS+JS，所有资源CDN加载，打开即可演示
 
 ## 使用方法
@@ -81,11 +77,7 @@ node /home/Vincent/.openclaw/workspace/skills/html-slideshow/scripts/generate-ht
   --input-dir /path/to/output/slides-md \
   --output /path/to/output/html \
   --title "演示标题" \
-  --theme tech  # 支持: default/nvidia/aliyun/dark/tech
-
-# 3. 使用自定义主题（可选）
-# 创建 /themes/my-theme.json 配置文件  
-# 使用 --theme my-theme 参数
+  --theme tech  # 或 aliyun/nvidia/dark/default
 ```
 
 ## 支持的布局

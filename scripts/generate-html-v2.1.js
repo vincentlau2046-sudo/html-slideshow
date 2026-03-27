@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * HTML Slideshow v2.3 - Final fix for cover page
- * Direct template replacement without nested divs
+ * HTML Slideshow v2.1 - Enhanced with stability fixes and error fallback
+ * Parse layout description and generate corresponding HTML structure
  */
 
 const fs = require('fs');
 const path = require('path');
 const MarkdownValidator = require('./markdown-validator');
-const LayoutParser = require('./layout-parser');
 
 // Theme configurations
 const THEMES = {
@@ -35,12 +34,56 @@ const THEMES = {
 };
 
 /**
+ * Parse layout description from markdown
+ * Returns layout structure
+ */
+function parseLayoutDescription(content) {
+  // Extract the page layout planning section
+  const lines = content.split('\n');
+  let inLayout = false;
+  const layoutLines = [];
+
+  for (const line of lines) {
+    if (line.includes('### 页面布局规划') || line.includes('页面布局规划')) {
+      inLayout = true;
+      continue;
+    }
+    if (inLayout) {
+      layoutLines.push(line.trim());
+    }
+  }
+
+  // Also check for layout: syntax
+  const layoutDirective = content.match(/layout:\s*(\S+)/i);
+  if (layoutDirective) {
+    return { layout: layoutDirective[1], contentWithoutLayout: content };
+  }
+
+  // Default layout detection
+  if (layoutLines.length === 0) {
+    return { layout: 'full', contentWithoutLayout: content };
+  }
+
+  const layoutText = layoutLines.join(' ').toLowerCase();
+  
+  if (layoutText.includes('左右分栏') || layoutText.includes('两栏')) {
+    return { layout: 'split-2', contentWithoutLayout: content };
+  } else if (layoutText.includes('2x2') || layoutText.includes('四格')) {
+    return { layout: 'grid-2x2', contentWithoutLayout: content };
+  } else if (layoutText.includes('上中下') || layoutText.includes('纵向')) {
+    return { layout: 'vertical', contentWithoutLayout: content };
+  } else if (layoutText.includes('表格') && layoutText.includes('图表')) {
+    return { layout: 'table-chart', contentWithoutLayout: content };
+  } else {
+    return { layout: 'full', contentWithoutLayout: content };
+  }
+}
+
+/**
  * Get first part of content (for split layouts)
  */
 function getFirstPart(content) {
-  const sections = content.split('\n\n').filter(s => s.trim() !== '');
-  if (sections.length === 0) return '';
-  
+  const sections = content.split('\n\n');
   const mid = Math.ceil(sections.length / 2);
   return sections.slice(0, mid).join('\n\n');
 }
@@ -49,9 +92,7 @@ function getFirstPart(content) {
  * Get second part of content (for split layouts)
  */
 function getSecondPart(content) {
-  const sections = content.split('\n\n').filter(s => s.trim() !== '');
-  if (sections.length === 0) return '';
-  
+  const sections = content.split('\n\n');
   const mid = Math.floor(sections.length / 2);
   return sections.slice(mid).join('\n\n');
 }
@@ -61,8 +102,6 @@ function getSecondPart(content) {
  */
 function getNthPart(content, index) {
   const sections = content.split('\n\n').filter(s => s.trim() !== '');
-  if (sections.length === 0) return '';
-  
   const parts = 4;
   const partSize = Math.ceil(sections.length / parts);
   const start = index * partSize;
@@ -71,127 +110,95 @@ function getNthPart(content, index) {
 }
 
 /**
- * Generate complete slide HTML based on layout
+ * Generate HTML for a specific layout
  */
-function generateCompleteSlideHTML(layout, content, title, themeConfig) {
-  // Read slide template
-  const slideTemplate = fs.readFileSync(path.join(__dirname, '../templates/slide.html'), 'utf8');
-  
-  let slideContent;
+function generateHTMLForLayout(layout, content, title) {
   switch (layout) {
     case 'split-2':
-      slideContent = `
-<div id="md-content"></div>
-<div class="split-layout">
-  <div class="column" id="col-1">
+      return `
+<div class="slide">
+  <div id="md-content"></div>
+  <div class="split-layout">
+    <div class="column" id="col-1">
+      <!-- Left column content will be rendered from markdown -->
 ${getFirstPart(content)}
-  </div>
-  <div class="column" id="col-2">
+    </div>
+    <div class="column" id="col-2">
+      <!-- Right column content -->
 ${getSecondPart(content)}
-  </div>
-</div>
-`;
-      break;
-
-    case 'grid-2x2':
-      slideContent = `
-<div id="md-content"></div>
-<div class="grid-4">
-  <div class="grid-card" id="cell-1">${getNthPart(content, 0)}</div>
-  <div class="grid-card" id="cell-2">${getNthPart(content, 1)}</div>
-  <div class="grid-card" id="cell-3">${getNthPart(content, 2)}</div>
-  <div class="grid-card" id="cell-4">${getNthPart(content, 3)}</div>
-</div>
-`;
-      break;
-
-    case 'table-chart':
-      slideContent = `
-<div id="md-content"></div>
-<div class="chart-wrapper">
-  <div class="table-side">
-${content}
-  </div>
-  <div class="chart-side">
-    <div class="chart-container">
-      <canvas id="chart"></canvas>
     </div>
   </div>
 </div>
 `;
-      break;
+
+    case 'grid-2x2':
+      return `
+<div class="slide">
+  <div id="md-content"></div>
+  <div class="grid-4">
+    <div class="grid-card" id="cell-1">${getNthPart(content, 0)}</div>
+    <div class="grid-card" id="cell-2">${getNthPart(content, 1)}</div>
+    <div class="grid-card" id="cell-3">${getNthPart(content, 2)}</div>
+    <div class="grid-card" id="cell-4">${getNthPart(content, 3)}</div>
+  </div>
+</div>
+`;
+
+    case 'table-chart':
+      return `
+<div class="slide">
+  <div id="md-content"></div>
+  <div class="chart-wrapper">
+    <div class="table-side">
+      <!-- Table content -->
+${content}
+    </div>
+    <div class="chart-side">
+      <div class="chart-container">
+        <canvas id="chart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+`;
 
     case 'vertical':
-      slideContent = `
-<div class="full-content">
-  <div id="md-content"></div>
+      return `
+<div class="slide">
+  <div class="full-content">
+    <div id="md-content"></div>
 ${content}
+  </div>
 </div>
 `;
-      break;
-
-    case 'cover':
-      slideContent = `
-<div class="slide-content">
-  <div id="md-content"></div>
-</div>
-`;
-      break;
 
     case 'full':
     default:
-      slideContent = `
-<div class="full-content">
-  <div id="md-content"></div>
+      return `
+<div class="slide">
+  <div class="full-content">
+    <div id="md-content"></div>
 ${content}
+  </div>
 </div>
 `;
-      break;
   }
-
-  // Apply layout class to slide div
-  let slideClass = 'slide';
-  if (layout === 'cover') {
-    slideClass += ' cover';
-  }
-
-  let html = slideTemplate
-    .replace(/{{TITLE}}/g, title)
-    .replace(/{{MAIN_TITLE}}/g, title)
-    .replace(/{{PRIMARY_COLOR}}/g, themeConfig.primaryColor)
-    .replace(/{{PRIMARY_COLOR_RGB}}/g, themeConfig.primaryColorRGB)
-    .replace(/{{{CONTENT_RAW}}}/g, content)
-    .replace(/<div class="slide">/, `<div class="${slideClass}">`)
-    .replace(/<div id="content"><\/div>/, `<div id="content">${slideContent}</div>`);
-
-  return html;
 }
 
 /**
  * Generate fallback HTML when main generation fails
  */
-function generateFallbackHTML(content, title, themeConfig) {
+function generateFallbackHTML(content, title) {
   console.warn(`Using fallback HTML for: ${title}`);
-  
-  const slideTemplate = fs.readFileSync(path.join(__dirname, '../templates/slide.html'), 'utf8');
-  return slideTemplate
-    .replace(/{{TITLE}}/g, title)
-    .replace(/{{MAIN_TITLE}}/g, title)
-    .replace(/{{PRIMARY_COLOR}}/g, themeConfig.primaryColor)
-    .replace(/{{PRIMARY_COLOR_RGB}}/g, themeConfig.primaryColorRGB)
-    .replace(/{{{CONTENT_RAW}}}/g, content)
-    .replace(/<div class="slide">/, `<div class="slide">`)
-    .replace(/<div id="content"><\/div>/, `<div id="content"><div class="full-content"><h1>${title}</h1>${content}</div></div>`);
-}
-
-/**
- * Detect layout from filename
- */
-function detectLayoutFromFilename(filename) {
-  if (filename.toLowerCase().includes('cover')) {
-    return 'cover';
-  }
-  return null;
+  return `
+<div class="slide">
+  <div class="full-content">
+    <h1>${title}</h1>
+    <div id="md-content"></div>
+${content}
+  </div>
+</div>
+`;
 }
 
 /**
@@ -206,6 +213,9 @@ function generateHTMLSlides(inputDir, htmlOutputDir, title, themeName) {
     fs.mkdirSync(slidesHtmlDir, { recursive: true });
   }
 
+  // Read slide template
+  const slideTemplate = fs.readFileSync(path.join(__dirname, '../templates/slide.html'), 'utf8');
+  
   // Validate and process each slide
   const validator = new MarkdownValidator();
   const mdFiles = fs.readdirSync(inputDir).filter(f => f.endsWith('.md'));
@@ -220,42 +230,46 @@ function generateHTMLSlides(inputDir, htmlOutputDir, title, themeName) {
       console.warn(`Validation warnings for ${filename}:`, validator.getWarnings());
       if (validator.getErrors().length > 0) {
         console.error(`Validation errors for ${filename}:`, validator.getErrors());
+        // Continue processing despite errors (use fallback later if needed)
       }
     }
 
     try {
       const content = fs.readFileSync(filePath, 'utf8');
-      
-      // First, check filename for cover detection
-      let layout = detectLayoutFromFilename(filename);
-      let cleanContent = content;
-      
-      // If not cover, parse layout from content
-      if (!layout) {
-        const parser = new LayoutParser();
-        const result = parser.parse(content);
-        layout = result.layout;
-        cleanContent = result.cleanContent;
-      }
+
+      // Parse layout
+      const { layout, contentWithoutLayout } = parseLayoutDescription(content);
 
       // Don't escape - marked will render correctly, HTML is allowed
-      const contentRaw = cleanContent.trim();
+      const contentRaw = contentWithoutLayout.trim();
 
       // Generate HTML with error handling
       let html;
       try {
-        html = generateCompleteSlideHTML(layout, contentRaw, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '), themeConfig);
+        const layoutHTML = generateHTMLForLayout(layout, contentRaw, filename);
+        html = slideTemplate
+          .replace(/{{TITLE}}/g, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '))
+          .replace(/{{MAIN_TITLE}}/g, title)
+          .replace(/{{PRIMARY_COLOR}}/g, themeConfig.primaryColor)
+          .replace(/{{PRIMARY_COLOR_RGB}}/g, themeConfig.primaryColorRGB)
+          .replace(/{{{CONTENT_RAW}}}/g, contentRaw)
+          .replace(/<div class="slide">/, `<div class="slide">${layoutHTML}`);
       } catch (layoutError) {
         console.error(`Layout generation failed for ${filename}:`, layoutError.message);
         // Use fallback HTML
-        html = generateFallbackHTML(contentRaw, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '), themeConfig);
+        html = slideTemplate
+          .replace(/{{TITLE}}/g, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '))
+          .replace(/{{MAIN_TITLE}}/g, title)
+          .replace(/{{PRIMARY_COLOR}}/g, themeConfig.primaryColor)
+          .replace(/{{PRIMARY_COLOR_RGB}}/g, themeConfig.primaryColorRGB)
+          .replace(/{{{CONTENT_RAW}}}/g, contentRaw);
       }
 
       // Write output
       const htmlFilename = filename.replace(/\.md$/, '.html');
       const outputPath = path.join(slidesHtmlDir, htmlFilename);
       fs.writeFileSync(outputPath, html, 'utf8');
-      console.log(`  Generated: slides/${htmlFilename} (${layout})`);
+      console.log(`  Generated: slides/${htmlFilename}`);
 
       slideList.push(`slides/${htmlFilename}`);
     } catch (error) {
@@ -263,7 +277,12 @@ function generateHTMLSlides(inputDir, htmlOutputDir, title, themeName) {
       // Create fallback slide
       try {
         const fallbackContent = `# Error Processing Slide\n\nFailed to process ${filename}. Please check the original markdown file.`;
-        const fallbackHTML = generateFallbackHTML(fallbackContent, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '), themeConfig);
+        const fallbackHTML = slideTemplate
+          .replace(/{{TITLE}}/g, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '))
+          .replace(/{{MAIN_TITLE}}/g, title)
+          .replace(/{{PRIMARY_COLOR}}/g, themeConfig.primaryColor)
+          .replace(/{{PRIMARY_COLOR_RGB}}/g, themeConfig.primaryColorRGB)
+          .replace(/{{{CONTENT_RAW}}}/g, fallbackContent);
 
         const htmlFilename = filename.replace(/\.md$/, '.html');
         const outputPath = path.join(slidesHtmlDir, htmlFilename);
