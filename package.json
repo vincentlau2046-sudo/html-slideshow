@@ -1,6 +1,6 @@
 {
   "name": "html-slideshow",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "将Markdown演示大纲转换为HTML静态幻灯片，自动分页、理解布局规划、生成对应HTML结构",
   "main": "index.js",
   "scripts": {

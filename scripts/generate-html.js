@@ -1,237 +1,285 @@
 #!/usr/bin/env node
 
 /**
- * HTML Slideshow - Generate HTML from split markdown slides
+ * HTML Slideshow v2.3 - Component-based template system
  * Parse layout description and generate corresponding HTML structure
+ * Using component registry and theme management
  */
 
 const fs = require('fs');
 const path = require('path');
+const MarkdownValidator = require('./markdown-validator');
+const LayoutAnalyzer = require('./layout-analyzer');
+const ComponentRegistry = require('./component-registry');
+const ThemeManager = require('./theme-manager');
 
-// Theme configurations
-const THEMES = {
-  default: {
-    primaryColor: '#2563eb',
-    primaryColorRGB: '37, 99, 235'
-  },
-  nvidia: {
-    primaryColor: '#76b900',
-    primaryColorRGB: '118, 185, 0'
-  },
-  aliyun: {
-    primaryColor: '#FF6A00',
-    primaryColorRGB: '255, 106, 0'
-  },
-  dark: {
-    primaryColor: '#60a5fa',
-    primaryColorRGB: '96, 165, 250'
-  },
-  tech: {
-    primaryColor: '#dc2626',
-    primaryColorRGB: '220, 38, 38'
-  }
-};
+// Initialize theme manager
+const themeManager = new ThemeManager();
+themeManager.initializeBuiltInThemes();
+themeManager.loadCustomThemes();
 
 /**
- * Parse layout description from markdown
- * Returns layout structure
+ * Get theme configuration with fallbacks
  */
-function parseLayoutDescription(content) {
-  // Extract the page layout planning section
-  const lines = content.split('\n');
-  let inLayout = false;
-  const layoutLines = [];
-
-  for (const line of lines) {
-    if (line.includes('### 页面布局规划') || line.includes('页面布局规划')) {
-      inLayout = true;
-      continue;
+function getThemeConfig(themeName) {
+  const builtInThemes = {
+    default: {
+      primaryColor: '#2563eb',
+      primaryColorRGB: '37, 99, 235',
+      secondaryColor: '#1a1a1a',
+      textColor: '#1f2937',
+      textLight: '#6b7280',
+      bgColor: '#ffffff'
+    },
+    nvidia: {
+      primaryColor: '#76b900',
+      primaryColorRGB: '118, 185, 0',
+      secondaryColor: '#1a1a1a',
+      textColor: '#1f2937',
+      textLight: '#6b7280',
+      bgColor: '#ffffff'
+    },
+    aliyun: {
+      primaryColor: '#FF6A00',
+      primaryColorRGB: '255, 106, 0',
+      secondaryColor: '#1a1a1a',
+      textColor: '#1f2937',
+      textLight: '#6b7280',
+      bgColor: '#ffffff'
+    },
+    dark: {
+      primaryColor: '#60a5fa',
+      primaryColorRGB: '96, 165, 250',
+      secondaryColor: '#ffffff',
+      textColor: '#ffffff',
+      textLight: '#a0a0a0',
+      bgColor: '#1a1a1a'
+    },
+    tech: {
+      primaryColor: '#dc2626',
+      primaryColorRGB: '220, 38, 38',
+      secondaryColor: '#000000',
+      textColor: '#000000',
+      textLight: '#333333',
+      bgColor: '#ffffff'
     }
-    if (inLayout) {
-      layoutLines.push(line.trim());
-    }
-  }
-
-  // Remove the layout section from content
-  const contentWithoutLayout = lines.filter(line => {
-    if (line.includes('### 页面布局规划') || line.includes('页面布局规划')) {
-      return false;
-    }
-    return true;
-  }).join('\n');
-
-  const layoutText = layoutLines.join(' ').toLowerCase();
-
-  // Detect layout type
-  let layout = {
-    type: 'full', // full width
-    structure: []
   };
 
-  if (layoutText.includes('左右分栏') || layoutText.includes('两栏布局') || layoutText.includes('左.*右')) {
-    layout.type = 'two-column';
-  } else if (layoutText.includes('2.*2') || layoutText.includes('网格') || layoutText.includes('四四')) {
-    layout.type = 'grid-2x2';
-  } else if (layoutText.includes('三栏') || layoutText.includes('左.*中.*右')) {
-    layout.type = 'three-column';
-  } else if (layoutText.includes('左侧表格.*右侧图表') || layoutText.includes('左表格.*右图表')) {
-    layout.type = 'table-chart';
-  } else if (layoutText.includes('上中下') || layoutText.includes('顶部.*中部.*底部')) {
-    layout.type = 'top-middle-bottom';
-  }
-
-  console.log(`  Layout detected: ${layout.type}`);
-  return { layout, contentWithoutLayout };
+  return builtInThemes[themeName] || builtInThemes.default;
 }
 
 /**
- * Generate HTML content based on layout type
+ * Parse layout description from markdown with enhanced detection
  */
-function generateLayoutHTML(content, layout, themeConfig) {
-  const primary = themeConfig.primaryColor;
+function parseLayoutDescription(content) {
+  const analyzer = new LayoutAnalyzer();
+  const layout = analyzer.analyzeLayout(content);
+  
+  return { layout: layout, contentWithoutLayout: content };
+}
 
-  switch (layout.type) {
-    case 'two-column':
-      return `
-<div class="slide">
-  <div id="md-content"></div>
-  <div class="grid-2">
-    <div class="column" id="col-1">
-      <!-- Left column content will be rendered from markdown -->
-${getFirstPart(content)}
-    </div>
-    <div class="column" id="col-2">
-      <!-- Right column content -->
-${getSecondPart(content)}
-    </div>
-  </div>
-</div>
-`;
+/**
+ * Get first part of content (for split layouts)
+ */
+function getFirstPart(content) {
+  const sections = content.split('\n\n').filter(s => s.trim() !== '');
+  if (sections.length === 0) return '';
+  
+  const mid = Math.ceil(sections.length / 2);
+  return sections.slice(0, mid).join('\n\n');
+}
+
+/**
+ * Get second part of content (for split layouts)
+ */
+function getSecondPart(content) {
+  const sections = content.split('\n\n').filter(s => s.trim() !== '');
+  if (sections.length === 0) return '';
+  
+  const mid = Math.floor(sections.length / 2);
+  return sections.slice(mid).join('\n\n');
+}
+
+/**
+ * Get nth part of content (for grid layouts)
+ */
+function getNthPart(content, index) {
+  const sections = content.split('\n\n').filter(s => s.trim() !== '');
+  if (sections.length === 0) return '';
+  
+  const parts = 4;
+  const partSize = Math.ceil(sections.length / parts);
+  const start = index * partSize;
+  const end = Math.min(start + partSize, sections.length);
+  return sections.slice(start, end).join('\n\n');
+}
+
+/**
+ * Generate HTML for a specific layout using components
+ */
+function generateHTMLForLayout(layout, content, title) {
+  const registry = ComponentRegistry;
+  
+  switch (layout) {
+    case 'split-2':
+      return registry.render('split-layout', {
+        left: getFirstPart(content),
+        right: getSecondPart(content)
+      });
 
     case 'grid-2x2':
-      return `
-<div class="slide">
-  <div id="md-content"></div>
-  <div class="grid-4">
-    <div class="grid-card" id="cell-1">${getNthPart(content, 0)}</div>
-    <div class="grid-card" id="cell-2">${getNthPart(content, 1)}</div>
-    <div class="grid-card" id="cell-3">${getNthPart(content, 2)}</div>
-    <div class="grid-card" id="cell-4">${getNthPart(content, 3)}</div>
-  </div>
-</div>
-`;
+      return registry.render('grid', {
+        columns: 2,
+        items: [
+          getNthPart(content, 0),
+          getNthPart(content, 1), 
+          getNthPart(content, 2),
+          getNthPart(content, 3)
+        ]
+      });
 
     case 'table-chart':
       return `
-<div class="slide">
-  <div id="md-content"></div>
-  <div class="chart-wrapper">
-    <div class="table-side">
-      <!-- Table content -->
-${content}
-    </div>
-    <div class="chart-side">
-      <div class="chart-container">
-        <canvas id="chart"></canvas>
-      </div>
+<div class="chart-wrapper">
+  <div class="table-side">
+    ${content}
+  </div>
+  <div class="chart-side">
+    <div class="chart-container">
+      <canvas id="chart"></canvas>
     </div>
   </div>
 </div>
 `;
+
+    case 'vertical':
+      return `<div class="full-content">${content}</div>`;
 
     case 'full':
     default:
-      return `
-<div class="slide">
-  <div class="full-content">
-    <div id="md-content"></div>
-${content}
-  </div>
-</div>
-`;
+      return `<div class="full-content">${content}</div>`;
   }
 }
 
-// Simple helpers to split content - in real usage markdown is rendered by marked
-function getFirstPart(content) {
-  // For now, we let marked handle all markdown rendering
-  return content;
-}
-function getSecondPart(content) {
-  return content;
-}
-function getNthPart(content, n) {
-  return content;
+/**
+ * Generate fallback HTML when main generation fails
+ */
+function generateFallbackHTML(content, title) {
+  console.warn(`Using fallback HTML for: ${title}`);
+  return `<div class="slide"><div class="full-content"><h1>${title}</h1>${content}</div></div>`;
 }
 
 /**
- * Convert title to slug
+ * Apply theme variables to template
  */
-function slugify(text) {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fa5\s]/g, '')
-    .replace(/\s+/g, '-')
-    .slice(0, 35);
+function applyThemeToTemplate(template, themeConfig) {
+  let result = template;
+  
+  // Replace theme variables
+  result = result.replace(/{{PRIMARY_COLOR}}/g, themeConfig.primaryColor);
+  result = result.replace(/{{PRIMARY_COLOR_RGB}}/g, themeConfig.primaryColorRGB);
+  result = result.replace(/{{SECONDARY_COLOR}}/g, themeConfig.secondaryColor);
+  result = result.replace(/{{TEXT_COLOR}}/g, themeConfig.textColor);
+  result = result.replace(/{{TEXT_LIGHT}}/g, themeConfig.textLight);
+  result = result.replace(/{{BG_COLOR}}/g, themeConfig.bgColor);
+  
+  // Set font family
+  const fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  result = result.replace(/var\(--font-family,[^)]+\)/g, fontFamily);
+  
+  return result;
 }
 
 /**
- * Main generation
+ * Main function to generate HTML slides
  */
-function generateHTMLSlides(options) {
-  const { inputDir, outputDir, title, theme } = options;
-
-  console.log(`Generating HTML from: ${inputDir}`);
-  console.log(`Theme: ${theme}`);
-
-  const themeConfig = THEMES[theme];
-
-  // Read all markdown slides
-  const mdFiles = fs.readdirSync(inputDir)
-    .filter(f => f.endsWith('.md'))
-    .sort();
-
-  console.log(`Found ${mdFiles.length} markdown slides`);
-
-  // Create output directories
-  const htmlOutputDir = path.join(outputDir, 'html');
+function generateHTMLSlides(inputDir, htmlOutputDir, title, themeName) {
+  const themeConfig = getThemeConfig(themeName);
+  
+  // Ensure output directories exist
   const slidesHtmlDir = path.join(htmlOutputDir, 'slides');
   if (!fs.existsSync(slidesHtmlDir)) {
     fs.mkdirSync(slidesHtmlDir, { recursive: true });
   }
 
-  // Read slide template
-  const slideTemplate = fs.readFileSync(path.join(__dirname, '../templates/slide.html'), 'utf8');
-
-  // Process each slide
+  // Read slide template (v2.3 version)
+  const slideTemplatePath = path.join(__dirname, '../templates/slide-v2.3.html');
+  let slideTemplate = fs.readFileSync(slideTemplatePath, 'utf8');
+  
+  // Apply theme to template
+  slideTemplate = applyThemeToTemplate(slideTemplate, themeConfig);
+  
+  // Validate and process each slide
+  const validator = new MarkdownValidator();
+  const mdFiles = fs.readdirSync(inputDir).filter(f => f.endsWith('.md'));
   const slideList = [];
+
   mdFiles.forEach((filename, index) => {
     console.log(`\nProcessing: ${filename}`);
     const filePath = path.join(inputDir, filename);
-    const content = fs.readFileSync(filePath, 'utf8');
+    
+    // Validate markdown file
+    if (!validator.validateFile(filePath)) {
+      console.warn(`Validation warnings for ${filename}:`, validator.getWarnings());
+      if (validator.getErrors().length > 0) {
+        console.error(`Validation errors for ${filename}:`, validator.getErrors());
+      }
+    }
 
-    // Parse layout
-    const { layout, contentWithoutLayout } = parseLayoutDescription(content);
+    try {
+      const content = fs.readFileSync(filePath, 'utf8');
 
-    // Don't escape - marked will render correctly, HTML is allowed
-    const contentRaw = contentWithoutLayout.trim();
+      // Parse layout with enhanced detection
+      const { layout, contentWithoutLayout } = parseLayoutDescription(content);
 
-    // Generate HTML
-    const slideTitle = filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' ');
-    let html = slideTemplate
-      .replace(/{{TITLE}}/g, slideTitle)
-      .replace(/{{MAIN_TITLE}}/g, title)
-      .replace(/{{PRIMARY_COLOR}}/g, themeConfig.primaryColor)
-      .replace(/{{PRIMARY_COLOR_RGB}}/g, themeConfig.primaryColorRGB)
-      .replace(/{{{CONTENT_RAW}}}/g, contentRaw);
+      // Don't escape - marked will render correctly, HTML is allowed
+      const contentRaw = contentWithoutLayout.trim();
 
-    // Write output
-    const htmlFilename = filename.replace(/\.md$/, '.html');
-    const outputPath = path.join(slidesHtmlDir, htmlFilename);
-    fs.writeFileSync(outputPath, html, 'utf8');
-    console.log(`  Generated: slides/${htmlFilename}`);
+      // Generate HTML with error handling
+      let html;
+      try {
+        const layoutHTML = generateHTMLForLayout(layout, contentRaw, filename);
+        html = slideTemplate
+          .replace(/{{TITLE}}/g, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '))
+          .replace(/{{MAIN_TITLE}}/g, title)
+          .replace(/{{{CONTENT_RAW}}}/g, contentRaw)
+          .replace(/<div class="slide"/, `<div class="slide" data-layout="${layout}"`);
+      } catch (layoutError) {
+        console.error(`Layout generation failed for ${filename}:`, layoutError.message);
+        // Use fallback HTML
+        html = slideTemplate
+          .replace(/{{TITLE}}/g, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '))
+          .replace(/{{MAIN_TITLE}}/g, title)
+          .replace(/{{{CONTENT_RAW}}}/g, contentRaw);
+      }
 
-    slideList.push(`slides/${htmlFilename}`);
+      // Write output
+      const htmlFilename = filename.replace(/\.md$/, '.html');
+      const outputPath = path.join(slidesHtmlDir, htmlFilename);
+      fs.writeFileSync(outputPath, html, 'utf8');
+      console.log(`  Generated: slides/${htmlFilename} (${layout})`);
+
+      slideList.push(`slides/${htmlFilename}`);
+    } catch (error) {
+      console.error(`Failed to process ${filename}:`, error.message);
+      // Create fallback slide
+      try {
+        const fallbackContent = `# Error Processing Slide\n\nFailed to process ${filename}. Please check the original markdown file.`;
+        const fallbackHTML = slideTemplate
+          .replace(/{{TITLE}}/g, filename.replace(/^\d+-/, '').replace(/\.md$/, '').replace(/-/g, ' '))
+          .replace(/{{MAIN_TITLE}}/g, title)
+          .replace(/{{{CONTENT_RAW}}}/g, fallbackContent);
+
+        const htmlFilename = filename.replace(/\.md$/, '.html');
+        const outputPath = path.join(slidesHtmlDir, htmlFilename);
+        fs.writeFileSync(outputPath, fallbackHTML, 'utf8');
+        console.log(`  Generated fallback: slides/${htmlFilename}`);
+        slideList.push(`slides/${htmlFilename}`);
+      } catch (fallbackError) {
+        console.error(`Failed to create fallback for ${filename}:`, fallbackError.message);
+        // Skip this slide entirely
+      }
+    }
   });
 
   // Generate index.html
@@ -247,55 +295,37 @@ function generateHTMLSlides(options) {
   fs.writeFileSync(indexPath, indexHtml, 'utf8');
   console.log(`\nGenerated: index.html`);
 
-  console.log(`\n✅ Done! Open ${indexPath} in browser to view`);
-
-  return {
-    slideCount: slideList.length,
-    indexPath,
-    outputDir: htmlOutputDir
-  };
+  return slideList;
 }
 
-// CLI entry
+// Command line interface
 if (require.main === module) {
   const args = process.argv.slice(2);
-  let inputDir = null;
-  let outputDir = null;
-  let title = null;
-  let theme = 'default';
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--input-dir' && i + 1 < args.length) {
-      inputDir = args[++i];
-    } else if (args[i] === '--output' && i + 1 < args.length) {
-      outputDir = args[++i];
-    } else if (args[i] === '--title' && i + 1 < args.length) {
-      title = args[++i];
-    } else if (args[i] === '--theme' && i + 1 < args.length) {
-      theme = args[++i];
-    }
+  const argMap = {};
+  for (let i = 0; i < args.length; i += 2) {
+    argMap[args[i]] = args[i + 1];
   }
 
-  if (!inputDir || !outputDir || !title) {
-    console.log(`
-Usage: node generate-html.js --input-dir <slides-md-dir> --output <output-dir> --title "Presentation Title" [--theme default|nvidia|aliyun|dark]
+  const inputDir = argMap['--input-dir'];
+  const output = argMap['--output'];
+  const title = argMap['--title'] || 'Presentation';
+  const theme = argMap['--theme'] || 'default';
 
-Example:
-  node generate-html.js \\
-    --input-dir ./my-presentation/slides-md \\
-    --output ./my-presentation \\
-    --title "My Presentation" \\
-    --theme aliyun
-`);
+  if (!inputDir || !output) {
+    console.error('Usage: node generate-html.js --input-dir <dir> --output <dir> [--title "Title"] [--theme theme]');
     process.exit(1);
   }
 
-  if (!THEMES[theme]) {
-    console.error(`Unknown theme: ${theme}. Available: ${Object.keys(THEMES).join(', ')}`);
+  console.log(`Generating HTML from: ${inputDir}`);
+  console.log(`Theme: ${theme}`);
+  
+  try {
+    generateHTMLSlides(inputDir, output, title, theme);
+    console.log('\n✅ Done! Open ' + path.join(output, 'index.html') + ' in browser to view');
+  } catch (error) {
+    console.error('Fatal error:', error.message);
     process.exit(1);
   }
-
-  generateHTMLSlides({ inputDir, outputDir, title, theme });
 }
 
 module.exports = { generateHTMLSlides };

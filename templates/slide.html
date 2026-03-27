@@ -17,11 +17,11 @@
 
         :root {
             --primary-color: {{PRIMARY_COLOR}};
-            --secondary-color: #000000; /* 黑色字体 */
-            --accent-color: {{PRIMARY_COLOR}};
-            --text-color: #000000; /* 黑色文字 */
-            --text-light: #333333; /* 深灰色辅助文字 */
-            --bg-color: #ffffff;
+            --secondary-color: {{SECONDARY_COLOR}};
+            --accent-color: {{ACCENT_COLOR}};
+            --text-color: {{TEXT_COLOR}};
+            --text-light: {{TEXT_LIGHT}};
+            --bg-color: {{BG_COLOR}};
             --border-color: #e5e7eb;
             --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
             --success-color: #10b981;
@@ -34,7 +34,7 @@
             height: 100%;
             background: var(--bg-color);
             color: var(--text-color);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif);
         }
 
         .slide {
@@ -46,62 +46,48 @@
             overflow: hidden;
         }
 
-        /* Cover page specific - auto-detect by title containing 'cover' */
-        .slide[data-title*="cover"],
-        .slide[data-title*="Cover"] {
+        /* Cover page specific */
+        .slide.cover {
             justify-content: center;
             align-items: center;
             text-align: center;
             padding: 0;
         }
 
-        .slide[data-title*="cover"] .slide-content,
-        .slide[data-title*="Cover"] .slide-content {
+        .slide.cover .slide-content {
             width: 60%;
             max-width: 60%;
         }
 
-        .slide[data-title*="cover"] h1,
-        .slide[data-title*="Cover"] h1 {
+        .slide.cover h1 {
             font-size: 52px;
-            color: var(--text-color); /* 黑色主标题 */
+            color: var(--text-color);
             margin-bottom: 28px;
-            font-weight: 700;
+            font-weight: var(--heading-weight, 700);
             letter-spacing: -0.5px;
             line-height: 1.2;
         }
 
-        .slide[data-title*="cover"] h2,
-        .slide[data-title*="Cover"] h2 {
+        .slide.cover h2 {
             font-size: 28px;
-            color: var(--text-light); /* 深灰色副标题 */
+            color: var(--text-light);
             margin-bottom: 28px;
-            font-weight: 500;
+            font-weight: var(--heading-weight-secondary, 500);
             line-height: 1.3;
         }
 
-        .slide[data-title*="cover"] h3,
-        .slide[data-title*="Cover"] h3 {
+        .slide.cover h3 {
             font-size: 24px;
-            color: var(--text-light); /* 深灰色信息 */
-            font-weight: 400;
+            color: var(--text-light);
+            font-weight: var(--body-weight, 400);
             line-height: 1.3;
             margin-bottom: 12px;
-        }
-
-        .slide[data-title*="cover"] .conclusion,
-        .slide[data-title*="Cover"] .conclusion {
-            background: #f9fafb;
-            padding: 32px 48px;
-            border-radius: 12px;
-            border-top: 4px solid var(--primary-color);
-            max-width: 80%;
         }
 
         /* Typography */
         h1 {
             font-size: 34px;
-            font-weight: 700;
+            font-weight: var(--heading-weight, 700);
             color: var(--secondary-color);
             margin-bottom: 8px;
             line-height: 1.3;
@@ -110,7 +96,7 @@
 
         h2 {
             font-size: 24px;
-            font-weight: 500;
+            font-weight: var(--heading-weight-secondary, 500);
             color: var(--primary-color);
             margin-bottom: 24px;
             line-height: 1.4;
@@ -118,7 +104,7 @@
 
         h3 {
             font-size: 19px;
-            font-weight: 600;
+            font-weight: var(--heading-weight-tertiary, 600);
             margin-bottom: 12px;
             color: var(--secondary-color);
         }
@@ -324,39 +310,39 @@
   <div id="content"></div>
 </div>
 
-    <script>
-        // Configure marked
-        marked.setOptions({
-            highlight: (code, lang) => {
-                if (lang && hljs.getLanguage(lang)) {
-                    return hljs.highlight(code, { language: lang }).value;
-                }
-                return hljs.highlightAuto(code).value;
-            },
-            breaks: true,
-            gfm: true,
-            html: true
-        });
-
-        // Render markdown content
-        const markdown = `{{{CONTENT_RAW}}}`;
-        document.getElementById('content').innerHTML = marked.parse(markdown);
-
-        // Communication with parent
-        window.parent.postMessage({type: 'slide-loaded'}, '*');
-
-        // Forward keyboard events to parent for navigation
-        document.addEventListener('keydown', (e) => {
-            if (['ArrowRight', 'ArrowLeft', ' ', 'Enter', 'Backspace', 'PageDown', 'PageUp'].includes(e.key)) {
-                window.parent.postMessage({
-                    type: 'keyboard',
-                    key: e.key
-                }, '*');
+<script>
+    // Configure marked
+    marked.setOptions({
+        highlight: (code, lang) => {
+            if (lang && hljs.getLanguage(lang)) {
+                return hljs.highlight(code, { language: lang }).value;
             }
-        });
+            return hljs.highlightAuto(code).value;
+        },
+        breaks: true,
+        gfm: true,
+        html: true
+    });
 
-        // Charts are initialized by the slide content if needed
+    // Render markdown content
+    const markdown = `{{{CONTENT_RAW}}}`;
+    document.getElementById('content').innerHTML = marked.parse(markdown);
+
+    // Communication with parent
+    window.parent.postMessage({type: 'slide-loaded'}, '*');
+
+    // Forward keyboard events to parent for navigation
+    document.addEventListener('keydown', (e) => {
+        if (['ArrowRight', 'ArrowLeft', ' ', 'Enter', 'Backspace', 'PageDown', 'PageUp'].includes(e.key)) {
+            window.parent.postMessage({
+                type: 'keyboard',
+                key: e.key
+            }, '*');
+        }
+    });
+
+    // Charts are initialized by the slide content if needed
 {{{CHART_SCRIPTS}}}
-    </script>
+</script>
 </body>
 </html>
