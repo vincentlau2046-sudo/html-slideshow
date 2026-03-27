@@ -25,6 +25,10 @@ const THEMES = {
   dark: {
     primaryColor: '#60a5fa',
     primaryColorRGB: '96, 165, 250'
+  },
+  tech: {
+    primaryColor: '#dc2626',
+    primaryColorRGB: '220, 38, 38'
   }
 };
 

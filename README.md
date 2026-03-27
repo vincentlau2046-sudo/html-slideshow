@@ -1,77 +1,61 @@
 # HTML Slideshow
 
-将Markdown格式的演示大纲，经过AI内容理解后，自动分页切分，根据每页的布局规划生成对应HTML结构，最终生成可交互的静态HTML幻灯片。
+将Markdown演示大纲转换为HTML静态幻灯片，自动分页，根据布局描述生成对应HTML结构。
 
-## 特性
+## 版本历史
 
-- **严格16:9比例**：每页固定16:9，不滚动，完美适配演示屏
-- **智能分页**：AI理解内容逻辑，自动切分成逻辑完整的页面
-- **布局识别**：根据"页面布局规划"文字描述，生成对应HTML布局
-- **完整键盘交互**：方向键、空格、回车、退格都支持翻页，F键全屏
-- **多主题支持**：default(蓝色商务)、nvidia(绿色)、aliyun(橙色)、dark(深色)
-- **静态输出**：纯HTML+CSS+JS，所有资源CDN加载，打开即可演示
+| 版本 | 日期 | 更新内容 | 作者 |
+|------|------|----------|------|
+| 0.2.0 | 2026-03-26 | 重构为两步流程：先AI理解分页，再生成独立md，最后生成HTML，支持布局描述识别 | 零壹 |
+| 0.1.0 | 2026-03-26 | 初始版本 | 零壹 |
 
-## 使用方法
+## 变更日志
 
-### 完整流程（从大纲到幻灯片）：
+### v0.2.0 (2026-03-26)
+- 🎯 重构为两步流程：
+  1. `split-slides.js`：读取完整大纲，按一级标题分页，每页保存独立md文件
+  2. `generate-html.js`：读取每页md，解析布局描述，生成对应HTML
+- 🔍 自动识别布局：支持左右分栏、2×2网格、表格+图表等
+- 🎨 四种主题：default(蓝色)、nvidia(绿色)、aliyun(橙色)、dark(深色)
+- ⌨️ 完整键盘交互，修复全屏翻页问题
+- 📝 保留每页原始md便于后续编辑
+
+## 使用流程
 
 ```bash
-# 1. AI分析内容，理解重构+分页生成每页md
-node scripts/split-slides.js \
-  --input /path/to/outline.md \
-  --output /path/to/output \
+# 第一步：分页拆分
+node skills/html-slideshow/scripts/split-slides.js \
+  --input /path/to/full-outline.md \
+  --output /path/to/project \
   --title "演示标题"
 
-# 2. 根据每页md生成HTML
-node scripts/generate-html.js \
-  --input-dir /path/to/output/slides-md \
-  --output /path/to/output \
+# 第二步：生成HTML
+node skills/html-slideshow/scripts/generate-html.js \
+  --input-dir /path/to/project/slides-md \
+  --output /path/to/project \
   --title "演示标题" \
   --theme aliyun
 ```
 
-## 支持的布局
+打开 `project/html/index.html` 即可开始演示。
 
-根据"页面布局规划"文字自动识别：
+## 布局识别
 
-| 描述                       | 生成布局                             |
-| ------------------------ | -------------------------------- |
-| "左右分栏" / "两栏布局"          | `grid-template-columns: 1fr 1fr` |
-| "2×2网格" / "四四布局"         | 2行2列网格                           |
-| "上中下" / "顶部标题+中部内容+底部总结" | flex纵向分布                         |
-| "左侧表格右侧图表"               | 左侧表格 + 右侧图表容器                    |
-
-## 交互快捷键
-
-| 按键                           | 功能   |
-| ---------------------------- | ---- |
-| → / Space / Enter / PageDown | 下一页  |
-| ← / Backspace / PageUp       | 上一页  |
-| F / f                        | 切换全屏 |
-| Esc                          | 退出全屏 |
-
-## 输出结构
+在每页markdown末尾添加：
 
 ```
-output/
-├── slides-md/              # 每页拆分后的markdown
-│   ├── 01-cover.md
-│   ├── 02-overview.md
-│   └── ...
-└── html/                   # 最终HTML输出
-    ├── index.html
-    └── slides/
-        ├── 01-cover.html
-        ├── 02-overview.html
-        └── ...
+### 页面布局规划
+- 顶部：大标题
+- 左半部：表格数据，右半部：饼图
+- 底部：三点总结
 ```
 
-## 依赖
+脚本能自动识别描述中的关键词：
+- `左右分栏` / `两栏` → 两栏布局
+- `2×2网格` / `四四布局` → 2×2网格
+- `左侧表格右侧图表` → 表格+图表布局
+- `三栏` → 三栏布局
 
-- Node.js
-- Chart.js (CDN)
-- Marked (CDN)
+## License
 
-## 示例
-
-examples 目录包含完整示例。
+MIT
